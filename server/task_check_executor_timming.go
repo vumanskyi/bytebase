@@ -22,7 +22,7 @@ type TaskCheckTimingExecutor struct {
 
 func (exec *TaskCheckTimingExecutor) Run(ctx context.Context, server *Server, taskCheckRun *api.TaskCheckRun) (result []api.TaskCheckResult, err error) {
 	taskFind := &api.TaskFind{
-		ID: &taskCheckRun.TaskId,
+		ID: &taskCheckRun.TaskID,
 	}
 	task, err := server.TaskService.FindTask(ctx, taskFind)
 	if err != nil {
@@ -42,7 +42,7 @@ func (exec *TaskCheckTimingExecutor) Run(ctx context.Context, server *Server, ta
 
 	// The following codes is a little awkward, for we only have 'TaskID' here
 	pipelineFind := &api.PipelineFind{
-		ID: &task.PipelineId,
+		ID: &task.ID,
 	}
 	pipeline, err := server.PipelineService.FindPipeline(ctx, pipelineFind)
 	if err != nil {

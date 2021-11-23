@@ -147,6 +147,10 @@ func NewServer(logger *zap.Logger, version string, host string, port int, fronte
 		taskCheckScheduler.Register(string(api.TaskCheckDatabaseStatementSyntax), statementExecutor)
 		taskCheckScheduler.Register(string(api.TaskCheckDatabaseStatementCompatibility), statementExecutor)
 
+		timingExecutor := NewTaskCheckTimingExecutor(logger)
+		taskCheckScheduler.Register(string(api.TaskCheckTimingTaskEarliestAllowedTime), timingExecutor)
+		taskCheckScheduler.Register(string(api.TaskCheckTimingEnvironmentWindow), timingExecutor)
+
 		databaseConnectExecutor := NewTaskCheckDatabaseConnectExecutor(logger)
 		taskCheckScheduler.Register(string(api.TaskCheckDatabaseConnect), databaseConnectExecutor)
 
