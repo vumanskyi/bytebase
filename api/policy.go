@@ -42,7 +42,7 @@ const (
 	// BackupPlanPolicyScheduleWeekly is WEEKLY backup plan policy value.
 	BackupPlanPolicyScheduleWeekly BackupPlanPolicySchedule = "WEEKLY"
 
-	// AllowedWindowUnset is ANYTIME allowed window cron.
+	// AllowedWindowUnset is ANYTIME allowed window cron, empty string means there is no window being set.
 	AllowedWindowUnset AllowedWindowCron = ""
 )
 
@@ -109,6 +109,7 @@ type PolicyService interface {
 	UpsertPolicy(ctx context.Context, upsert *PolicyUpsert) (*Policy, error)
 	GetBackupPlanPolicy(ctx context.Context, environmentID int) (*BackupPlanPolicy, error)
 	GetPipelineApprovalPolicy(ctx context.Context, environmentID int) (*PipelineApprovalPolicy, error)
+	GetAllowedWindowPolicy(ctx context.Context, environmentID int) (*AllowedWindowPolicy, error)
 }
 
 // PipelineApprovalPolicy is the policy configuration for pipeline approval
@@ -239,7 +240,6 @@ func GetDefaultPolicy(pType PolicyType) (string, error) {
 		return AllowedWindowPolicy{
 			Cron: AllowedWindowUnset,
 		}.String()
-
 	}
 
 	return "", nil

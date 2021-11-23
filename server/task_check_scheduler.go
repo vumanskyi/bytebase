@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -177,7 +178,122 @@ func (s *TaskCheckScheduler) Register(taskType string, executor TaskCheckExecuto
 	s.executors[taskType] = executor
 }
 
+// scheduleTaskTimingCheckIfNeeded will schedule a TaskCheck to check whether it is passed the earliest time allowed for a task to be executed.
+// NOTE: A new taskCheck will be created if and only if:
+// 1. No taskCheck of the same type had been created before
+// 2. The time specified in the payload field named 'nextTs' is passed.
+func (s *TaskCheckScheduler) scheduleTaskTimingCheckIfNeeded(ctx context.Context, task *api.Task, creatorID int) error {
+	payload, err := json.Marshal(api.TaskCheckTimingPayload{
+		NextCheckRunTime: strconv.FormatInt(task.NotBeforeTs, 10),
+	})
+	lastCheckRun, err := s.server.TaskCheckRunService.CreateTaskCheckRunIfNeeded(ctx, &api.TaskCheckRunCreate{
+		CreatorID:               creatorID,
+		TaskID:                  task.ID,
+		Type:                    api.TaskCheckTimingTaskEarliestAllowedTime,
+		SkipIfAlreadyTerminated: true,
+		Payload:                 string(payload),
+	})
+	if err != nil {
+		return err
+	}
+	// this suggests that the timing taskCheck has been executed before, thus we need to check if it is necessary to schedule another check
+	if lastCheckRun.Status != api.TaskCheckRunRunning {
+		timingPayload := &api.TaskCheckTimingPayload{}
+		err = json.Unmarshal([]byte(lastCheckRun.Payload), timingPayload)
+		if err != nil {
+			return err
+		}
+		nextTs, err := strconv.Atoi(timingPayload.NextCheckRunTime)
+		if err != nil {
+			return err
+		}
+		if time.Now().After(time.Unix(int64(nextTs), 0)) {
+			_, err := s.server.TaskCheckRunService.CreateTaskCheckRunIfNeeded(ctx, &api.TaskCheckRunCreate{
+				CreatorID:               creatorID,
+				TaskID:                  task.ID,
+				Type:                    api.TaskCheckTimingTaskEarliestAllowedTime,
+				SkipIfAlreadyTerminated: false,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// scheduleEnvironmentTimingCheckIfNeeded will schedule a TaskCheck to check whether it is within the allowed window specified by an environment
+// NOTE: A new taskCheck will be created if and only if:
+// 1. No taskCheck of the same type had been created before
+// 2. The time specified in the payload field named 'nextTs' is passed.
+func (s *TaskCheckScheduler) scheduleEnvironmentTimingCheckIfNeeded(ctx context.Context, task *api.Task, creatorID int) error {
+	// Retrieve the policy for the environment, which the task belongs
+	pipelineFind := &api.PipelineFind{
+		ID: &task.PipelineID,
+	}
+	pipeline, err := s.server.PipelineService.FindPipeline(ctx, pipelineFind)
+	if err != nil {
+		return err
+	}
+	env := pipeline.StageList[0].Environment
+	if env == nil {
+		return err
+	}
+	windowPolicy, err := s.server.PolicyService.GetAllowedWindowPolicy(ctx, env.ID)
+	cron, err := api.GetAllowedWindowCronParser().Parse(string(windowPolicy.Cron))
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(api.TaskCheckTimingPayload{
+		NextCheckRunTime: strconv.FormatInt(cron.Next(time.Now()).Unix(), 10),
+	})
+
+	lastCheckRun, err := s.server.TaskCheckRunService.CreateTaskCheckRunIfNeeded(ctx, &api.TaskCheckRunCreate{
+		CreatorID:               creatorID,
+		TaskID:                  task.ID,
+		Type:                    api.TaskCheckTimingEnvironmentWindow,
+		SkipIfAlreadyTerminated: true,
+		Payload:                 string(payload),
+	})
+	// This suggests that the task check has been already executed, thus we need to check if it is necessary to schedule another check
+	if lastCheckRun.Status != api.TaskCheckRunRunning {
+		timingPayload := &api.TaskCheckTimingPayload{}
+		err = json.Unmarshal([]byte(lastCheckRun.Payload), timingPayload)
+		if err != nil {
+			return err
+		}
+		nextTs, err := strconv.Atoi(timingPayload.NextCheckRunTime)
+		if err != nil {
+			return err
+		}
+
+		if time.Now().After(time.Unix(int64(nextTs), 0)) {
+			_, err := s.server.TaskCheckRunService.CreateTaskCheckRunIfNeeded(ctx, &api.TaskCheckRunCreate{
+				CreatorID:               creatorID,
+				TaskID:                  task.ID,
+				Type:                    api.TaskCheckTimingTaskEarliestAllowedTime,
+				Payload:                 string(payload),
+				SkipIfAlreadyTerminated: false,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (s *TaskCheckScheduler) ScheduleCheckIfNeeded(ctx context.Context, task *api.Task, creatorID int, skipIfAlreadyTerminated bool) (*api.Task, error) {
+	err := s.scheduleTaskTimingCheckIfNeeded(ctx, task, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	err = s.scheduleTaskTimingCheckIfNeeded(ctx, task, creatorID)
+	if err != nil {
+		return nil, err
+	}
 	if task.Type == api.TaskDatabaseSchemaUpdate {
 		taskPayload := &api.TaskDatabaseSchemaUpdatePayload{}
 		if err := json.Unmarshal([]byte(task.Payload), taskPayload); err != nil {
@@ -256,5 +372,6 @@ func (s *TaskCheckScheduler) ScheduleCheckIfNeeded(ctx context.Context, task *ap
 
 		return task, err
 	}
+
 	return task, nil
 }

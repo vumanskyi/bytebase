@@ -62,6 +62,8 @@ const (
 	TaskCheckDatabaseStatementCompatibility TaskCheckType = "bb.task-check.database.statement.compatibility"
 	TaskCheckDatabaseConnect                TaskCheckType = "bb.task-check.database.connect"
 	TaskCheckInstanceMigrationSchema        TaskCheckType = "bb.task-check.instance.migration-schema"
+	TaskCheckTimingEnvironmentWindow        TaskCheckType = "bb.task-check.timing.environment.allowed-window"
+	TaskCheckTimingTaskEarliestAllowedTime  TaskCheckType = "bb.task-check.timing.task.earliest-allowed-time"
 )
 
 type TaskCheckDatabaseStatementAdvisePayload struct {
@@ -69,6 +71,10 @@ type TaskCheckDatabaseStatementAdvisePayload struct {
 	DbType    db.Type `json:"dbType,omitempty"`
 	Charset   string  `json:"charset,omitempty"`
 	Collation string  `json:"collation,omitempty"`
+}
+
+type TaskCheckTimingPayload struct {
+	NextCheckRunTime string `json:"nextCheckRunTime,omitempty"`
 }
 
 type TaskCheckResult struct {

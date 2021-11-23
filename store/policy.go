@@ -227,3 +227,16 @@ func (s *PolicyService) GetPipelineApprovalPolicy(ctx context.Context, environme
 	}
 	return api.UnmarshalPipelineApprovalPolicy(policy.Payload)
 }
+
+// GetAllowedWindowPolicy will get the allowed window policy for an environment.
+func (s *PolicyService) GetAllowedWindowPolicy(ctx context.Context, environmentID int) (*api.AllowedWindowPolicy, error) {
+	pType := api.PolicyTypeAllowedWindow
+	policy, err := s.FindPolicy(ctx, &api.PolicyFind{
+		EnvironmentId: &environmentID,
+		Type:          &pType,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return api.UnmarshalAllowedWindowPolicy(policy.Payload)
+}

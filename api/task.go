@@ -113,6 +113,9 @@ type Task struct {
 	Status  TaskStatus `jsonapi:"attr,status"`
 	Type    TaskType   `jsonapi:"attr,type"`
 	Payload string     `jsonapi:"attr,payload"`
+	// NotBeforeTs specifies the earliest allowed timing for a task to be executed
+	// If NotBeforeTs is set to 0, the task will be executed once meets other gating requirements.
+	NotBeforeTs int64 `jsonapi:"attr,notBeforeTs"`
 }
 
 type TaskCreate struct {
@@ -131,8 +134,9 @@ type TaskCreate struct {
 	Name   string     `jsonapi:"attr,name"`
 	Status TaskStatus `jsonapi:"attr,status"`
 	Type   TaskType   `jsonapi:"attr,type"`
-	// Payload is dirived from fields below it
+	// Payload is driven from fields below it
 	Payload           string
+	NotBeforeTs       int64  `jsonapi:"attr,notBeforeTs"`
 	Statement         string `jsonapi:"attr,statement"`
 	RollbackStatement string `jsonapi:"attr,rollbackStatement"`
 	DatabaseName      string `jsonapi:"attr,databaseName"`
@@ -186,6 +190,17 @@ type TaskStatusPatch struct {
 	Code    *common.Code
 	Comment *string `jsonapi:"attr,comment"`
 	Result  *string
+}
+
+type TaskTimingPatch struct {
+	ID int
+
+	// Standard fields
+	// Value is assigned from the jwt subject field passed by the client.
+	UpdaterId int
+
+	// Domain specific fields
+	NotBeforeTs *int64 `jsonapi:"attr,notBeforeTs"`
 }
 
 type TaskService interface {
